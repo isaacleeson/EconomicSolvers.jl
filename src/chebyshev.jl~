@@ -1,0 +1,44 @@
+export Chebyshev
+
+struct Chebyshev{D} <: Iterable ... GriddedType (on irregular grid...)
+    degree::D
+end
+
+
+
+function chebyshev_polynomial(D,z)
+    values[1] = 1.0
+    values[2] = 2*z*values
+    for i in 3:d
+        @inbounds values[i] = 2*z*values[i-1]-values[i-2]
+    end
+    return values
+end
+Interpolations.degree(chebyshev::Chebyshev)=chebyshev.degree
+@inline function Interpolations.weightedindex_parts(fs::F, mode::Chebyshev{D}, knotvec::AbstractVector, x) where D,F
+    z = (x-knotvec[begin])/(knotvec[end]-knotvec[begin])
+    (position=1, coefs=Interpolations.fmap(fs,(D,z)))
+end
+function Interpolations.value_weights(T::Val{N},z::F) where {N,F}
+    NTuple{N,F}(ChebyshevPolynomial(N,z))
+end
+
+# chebyshev iterator
+mutable struct ChebyshevPolynomial{T}
+    n::Int
+    z::T
+    _v::T
+    __v::T
+end
+ChebyshevPolynomial(n,z::T) where T = ChebyshevPolynomial(n,z,convert(T,0.5),zero(T))
+function Base.iterate(cheb::ChebyshevPolynomial{T}) where T
+    return one(T), 2
+end
+function Base.iterate(cheb::ChebyshevPolynomial{T}, degree) where T
+    degree > cheb.n && return nothing
+    v = 2*cheb.z*cheb._v-cheb.__v
+    cheb.__v = cheb._v
+    cheb._v = v
+    return v, degree+1
+end
+Base.length(cheb::ChebyshevPolynomial)=cheb.n
